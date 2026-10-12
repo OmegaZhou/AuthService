@@ -186,7 +186,7 @@ new file mode 100644
 +
 +var loginEmailTemplate = &templates.EmailTemplate{
 +	Text: text.Must(text.New("login").Parse("Your login password: {{.Password}}\nValid for 15 minutes, one use only. Do not share it.\nIf you did not request this login, ignore this message.")),
-+	HTML: html.Must(html.New("login").Parse("<h2>登录临时密码</h2><p style='font-size:28px;letter-spacing:4px'>{{.Password}}</p><p>15 分钟内有效，仅能使用一次。请勿转发。如果不是你发起的登录，请忽略。</p>")),
++	HTML: html.Must(html.New("login").Parse("<h2>登录临时密码</h2><p><code style='font-size:20px;overflow-wrap:anywhere;word-break:break-all;user-select:all'>{{.Password}}</code></p><p>请复制完整密码，区分大小写。15 分钟内有效，仅能使用一次。请勿转发。如果不是你发起的登录，请忽略。</p>")),
 +}
 +
 +func EmailOTPRequestPOST(ctx *middlewares.AutheliaCtx) {

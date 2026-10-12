@@ -2,6 +2,7 @@ package emailotp
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"os"
 	"path/filepath"
@@ -30,6 +31,26 @@ func setup(t *testing.T) (*Manager, *fakeAccount, *time.Time) {
 	now := time.Now()
 	return &Manager{Path: filepath.Join(t.TempDir(), "state.json"), Now: func() time.Time { return now }}, &fakeAccount{}, &now
 }
+func TestIssuedPasswordStrengthAndFullValueRequired(t *testing.T) {
+	m, a, _ := setup(t)
+	var password string
+	if err := m.Issue("user@example.com", a, func(_, p string) error { password = p; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	randomBytes, err := base64.RawURLEncoding.DecodeString(password)
+	if err != nil || len(password) != 32 || len(randomBytes) != 24 {
+		t.Fatal("login password must encode 192 random bits in 32 URL-safe characters")
+	}
+	if ok, err := m.Consume("user@example.com", password[:8], a); err != nil || ok {
+		t.Fatal("truncated password accepted", err)
+	}
+	if ok, err := m.Consume("user@example.com", password, a); err != nil || !ok {
+		t.Fatal("full password rejected", err)
+	}
+	if ok, err := m.Consume("user@example.com", password, a); err != nil || ok {
+		t.Fatal("consumed password accepted again", err)
+	}
+}
 func TestCooldownSurvivesRestart(t *testing.T) {
 	m, a, now := setup(t)
 	var password string
@@ -56,6 +77,9 @@ func TestCooldownSurvivesRestart(t *testing.T) {
 	}
 	if err := fresh.Issue("user@example.com", a, send); err != nil || sends != 2 {
 		t.Fatal("next window failed", err)
+	}
+	if password == original {
+		t.Fatal("new challenge reused the previous password")
 	}
 }
 func TestConcurrentConsumeOnlyOnce(t *testing.T) {

@@ -5,11 +5,10 @@ package emailotp
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,6 +17,9 @@ import (
 
 const Lifetime = 15 * time.Minute
 const MaxAttempts = 5
+
+// 24 random bytes encode to 32 URL-safe characters, providing 192 bits of entropy.
+const LoginPasswordBytes = 24
 
 type Account interface {
 	SetPassword(username, password string) error
@@ -86,6 +88,14 @@ func randomPassword() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+func randomLoginPassword() (string, error) {
+	b := make([]byte, LoginPasswordBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
 // Issue only accepts an already resolved, administrator-created account.
 // Cooldown is persisted before any external side effect, including SMTP.
 func (m *Manager) Issue(username string, account Account, send Sender) error {
@@ -100,11 +110,10 @@ func (m *Manager) Issue(username string, account Account, send Sender) error {
 	if exists && now < previous.Issued+int64(Lifetime.Seconds()) {
 		return nil
 	}
-	number, err := rand.Int(rand.Reader, big.NewInt(100000000))
+	password, err := randomLoginPassword()
 	if err != nil {
 		return err
 	}
-	password := fmt.Sprintf("%08d", number.Int64())
 	state[username] = Challenge{Issued: now, Used: true}
 	if err = m.save(state); err != nil {
 		return err
