@@ -7,6 +7,8 @@ log:
 authentication_backend:
   password_reset:
     disable: true
+  password_change:
+    disable: true
   file:
     path: '/var/lib/auth-service/users.yml'
     watch: true
@@ -14,6 +16,8 @@ authentication_backend:
       algorithm: argon2
       argon2:
         variant: argon2id
+webauthn:
+  enable_passkey_login: false
 access_control:
   default_policy: deny
   rules:
@@ -30,8 +34,16 @@ storage:
   local:
     path: '/var/lib/auth-service/database.sqlite3'
 notifier:
-  filesystem:
-    filename: '/var/lib/auth-service/notifications.txt'
+  smtp:
+    address: 'submission://smtp.example.com:587'
+    username: 'sender@example.com'
+    # Set AUTHELIA_NOTIFIER_SMTP_PASSWORD_FILE to a private file.
+    # Do not also define password here when using the secret file.
+    sender: 'AuthService <sender@example.com>'
+    identifier: 'auth.example.com'
+    startup_check_address: 'owner@example.com'
+    subject: '[Account login] {title}'
+    timeout: '15 seconds'
 identity_providers:
   oidc:
     hmac_secret: 'REPLACE_WITH_RANDOM_OAUTH_SECRET'

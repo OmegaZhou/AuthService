@@ -68,12 +68,15 @@ RFC 9068 access token（typ: at+jwt），包含 sub、client_id、iat、exp、jt
 复制 `deployment/configuration.example.yml` 和 `users.example.yml` 到私有配置
 目录并替换所有占位符，再通过 Authelia validate-config 检查。邮件模式需
 禁用密码重置、更改和 passkey 登录，配置真实 SMTP，且账号文件必须可写。
+默认样例使用 SMTP 发信；从零部署的发信账号、密码文件、收件账号和启动配置
+见 [邮箱登录部署说明](deployment/email-login.md)。不需要 VPS 预装邮件服务器。
 systemd/Nginx 样例为 `deployment/auth-service.service` 和
 `deployment/nginx-auth-service.conf`，使用服务名 `auth-service` 和 `/auth` 路径。
 管理员命令名为 `auth-service-password` 和 `auth-service-rename-user`。
 
 `prepare-email-login.py` 是一次性预配置工具，可以复制管理员指定 SMTP 环境
 文件中的凭据；运行时不会读取其来源。`--group` 选择用户所属认证组。
+这是复用现有 SMTP 配置的可选工具；新部署可直接填写配置样例。
 `smoke-email-login.py` 用独立数据库副本和回环端口检查构建产物；
 `install-email-login.sh` 用于现有服务切换，失败自动回滚。新账号注册仅执行一次。
 部署工具的 AUTH_* 参数可指定实际服务、目录和健康地址。

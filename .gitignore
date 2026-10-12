@@ -7,6 +7,7 @@
 *.env
 !*.env.example
 *.key
+*.password
 *.pem
 *.sqlite*
 *.db*
