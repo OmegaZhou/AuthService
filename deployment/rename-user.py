@@ -15,9 +15,9 @@ import tempfile
 
 import yaml
 
-ROOT = Path(os.environ.get('AUTH_CONFIG_DIR', '/etc/gpt-plugin-oauth'))
-BINARY = os.environ.get('AUTH_BINARY', '/opt/gpt-plugin-oauth/authelia')
-SERVICE = os.environ.get('AUTH_SERVICE', 'gpt-plugin-oauth')
+ROOT = Path(os.environ.get('AUTH_CONFIG_DIR', '/etc/auth-service'))
+BINARY = os.environ.get('AUTH_BINARY', '/opt/auth-service/authelia')
+SERVICE = os.environ.get('AUTH_SERVICE', 'auth-service')
 
 
 def prepare(users, old, new):
@@ -90,7 +90,7 @@ def main():
         if args.check:
             print('Ready. Username changes preserve the canonical subject; no changes made.')
             return
-        backup_root = Path(os.environ.get('AUTH_BACKUP_DIR', '/var/backups/gpt-plugin-oauth'))
+        backup_root = Path(os.environ.get('AUTH_BACKUP_DIR', '/var/backups/auth-service'))
         backup_root.mkdir(mode=0o700, parents=True, exist_ok=True)
         backup = Path(tempfile.mkdtemp(prefix='rename-', dir=backup_root))
         stopped = False

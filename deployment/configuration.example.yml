@@ -8,7 +8,7 @@ authentication_backend:
   password_reset:
     disable: true
   file:
-    path: '/var/lib/gpt-plugin-oauth/users.yml'
+    path: '/var/lib/auth-service/users.yml'
     watch: true
     password:
       algorithm: argon2
@@ -28,10 +28,10 @@ session:
 storage:
   encryption_key: 'REPLACE_WITH_RANDOM_STORAGE_KEY'
   local:
-    path: '/var/lib/gpt-plugin-oauth/database.sqlite3'
+    path: '/var/lib/auth-service/database.sqlite3'
 notifier:
   filesystem:
-    filename: '/var/lib/gpt-plugin-oauth/notifications.txt'
+    filename: '/var/lib/auth-service/notifications.txt'
 identity_providers:
   oidc:
     hmac_secret: 'REPLACE_WITH_RANDOM_OAUTH_SECRET'

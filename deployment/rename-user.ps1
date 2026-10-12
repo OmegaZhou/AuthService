@@ -11,7 +11,7 @@ param(
     [switch]$Check
 )
 $ErrorActionPreference = 'Stop'
-$remoteCommand = "sudo -- /usr/local/sbin/gpt-plugin-oauth-rename-user --username $Username --new-username $NewUsername"
+$remoteCommand = "sudo -- /usr/local/sbin/auth-service-rename-user --username $Username --new-username $NewUsername"
 if ($Check) { $remoteCommand += ' --check' }
 & ssh -t $SshHost $remoteCommand
 if ($LASTEXITCODE -ne 0) { throw "Account reset exited with code $LASTEXITCODE" }

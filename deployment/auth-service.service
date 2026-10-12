@@ -1,0 +1,22 @@
+[Unit]
+Description=Shared account authentication (Authelia)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=auth-service
+Group=auth-service
+ExecStart=/opt/auth-service/authelia --config /etc/auth-service/configuration.yml
+Restart=on-failure
+RestartSec=5
+StateDirectory=auth-service
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/auth-service
+
+[Install]
+WantedBy=multi-user.target

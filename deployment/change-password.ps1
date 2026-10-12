@@ -9,7 +9,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 # Password entry happens on the SSH terminal, never in arguments or a local file.
-$remoteCommand = "sudo -- /usr/local/sbin/gpt-plugin-oauth-password --username $Username"
+$remoteCommand = "sudo -- /usr/local/sbin/auth-service-password --username $Username"
 if ($Check) { $remoteCommand += ' --check' }
 & ssh -t $SshHost $remoteCommand
 if ($LASTEXITCODE -ne 0) { throw "Password tool exited with code $LASTEXITCODE" }

@@ -1,3 +1,3 @@
-module github.com/OmegaZhou/GptPluginOauth
+module github.com/OmegaZhou/AuthService
 
 go 1.23

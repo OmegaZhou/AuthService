@@ -12,7 +12,7 @@ import tempfile
 from argon2 import PasswordHasher, Type
 import yaml
 
-ROOT = Path(os.environ.get('AUTH_CONFIG_DIR', '/etc/gpt-plugin-oauth'))
+ROOT = Path(os.environ.get('AUTH_CONFIG_DIR', '/etc/auth-service'))
 
 
 def replace_password(path, username, password):
