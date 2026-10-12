@@ -1,0 +1,229 @@
+diff --git a/internal/handlers/handler_firstfactor_password.go b/internal/handlers/handler_firstfactor_password.go
+index 4cfb570..9f5e610 100644
+--- a/internal/handlers/handler_firstfactor_password.go
++++ b/internal/handlers/handler_firstfactor_password.go
+@@ -67,7 +67,12 @@ func FirstFactorPasswordPOST(delayer middlewares.Delayer) middlewares.RequestHan
+ 			return
+ 		}
+ 
+-		userPasswordOk, err := ctx.Providers.UserProvider.CheckUserPassword(details.Username, bodyJSON.Password)
++		var userPasswordOk bool
++		if EmailOTPEnabled() {
++			userPasswordOk, err = loginChallenges.Consume(details.Username, bodyJSON.Password, emailOTPAccount{ctx})
++		} else {
++			userPasswordOk, err = ctx.Providers.UserProvider.CheckUserPassword(details.Username, bodyJSON.Password)
++		}
+ 		if err != nil {
+ 			if isRegulatorSkippedErr(err) {
+ 				ctx.Logger.WithError(err).Errorf("Unsuccessful %s authentication attempt by user '%s'", regulation.AuthType1FA, details.Username)
+diff --git a/internal/server/handlers.go b/internal/server/handlers.go
+index 8509c7a..8fc335c 100644
+--- a/internal/server/handlers.go
++++ b/internal/server/handlers.go
+@@ -256,7 +256,12 @@ func handlerMain(config *schema.Configuration, providers middlewares.Providers)
+ 	delayerPassword := middlewares.NewTimingAttackDelay(10, time.Second).SetRecord(true)
+ 
+ 	r.POST("/api/firstfactor", middlewareAPI(handlers.FirstFactorPasswordPOST(delayerPassword)))
+-	r.POST("/api/firstfactor/reauthenticate", middleware1FA(handlers.FirstFactorReauthenticatePOST(delayerPassword)))
++	r.GET("/api/email-otp/configuration", middlewareAPI(handlers.EmailOTPConfigurationGET))
++	rateLimitEmailOTP := middlewares.NewRateLimiter(middlewares.WithRateLimitConfig(config.Server.Endpoints.RateLimits.ResetPasswordStart), middlewares.WithRateLimitCollector(providers.GarbageCollector)).Middleware()
++	r.POST("/api/email-otp/request", middlewareAPI(rateLimitEmailOTP(handlers.EmailOTPRequestPOST)))
++	if !handlers.EmailOTPEnabled() {
++		r.POST("/api/firstfactor/reauthenticate", middleware1FA(handlers.FirstFactorReauthenticatePOST(delayerPassword)))
++	}
+ 	r.POST("/api/logout", middlewareAPI(handlers.LogoutPOST))
+ 
+ 	if !config.AuthenticationBackend.PasswordReset.Disable && config.AuthenticationBackend.PasswordReset.CustomURL.String() == "" {
+diff --git a/web/src/views/LoginPortal/FirstFactor/FirstFactorForm.tsx b/web/src/views/LoginPortal/FirstFactor/FirstFactorForm.tsx
+index 0b7ff65..8e3919f 100644
+--- a/web/src/views/LoginPortal/FirstFactor/FirstFactorForm.tsx
++++ b/web/src/views/LoginPortal/FirstFactor/FirstFactorForm.tsx
+@@ -24,7 +24,9 @@ import { usePasswordVisibility } from "@hooks/PasswordVisibility";
+ import { useQueryParam } from "@hooks/QueryParam";
+ import LoginLayout from "@layouts/LoginLayout";
+ import { IsCapsLockModified } from "@services/CapsLock";
++import { Get, PostWithOptionalResponse } from "@services/Client";
+ import { postFirstFactor } from "@services/Password";
++import { getBasePath } from "@utils/BasePath";
+ import PasskeyForm from "@views/LoginPortal/FirstFactor/PasskeyForm";
+ 
+ export interface Props {
+@@ -61,6 +63,30 @@ const FirstFactorForm = function (props: Props) {
+     const [passwordCapsLockPartial, setPasswordCapsLockPartial] = useState(false);
+     const [passwordError, setPasswordError] = useState(false);
+     const [loading, setLoading] = useState(false);
++    const [emailLogin, setEmailLogin] = useState(false);
++    const [sendingEmail, setSendingEmail] = useState(false);
++    const [emailMessage, setEmailMessage] = useState("");
++    useEffect(() => {
++        Get<{ enabled: boolean }>(getBasePath() + "/api/email-otp/configuration")
++            .then((value) => setEmailLogin(value.enabled))
++            .catch(() => {});
++    }, []);
++    const requestEmail = async () => {
++        if (sendingEmail || !username.trim()) return;
++        setSendingEmail(true);
++        try {
++            await PostWithOptionalResponse(getBasePath() + "/api/email-otp/request", {
++                username: username.trim().toLowerCase(),
++            });
++            setEmailMessage(
++                "若账号存在，临时密码将发送到该邮箱。15 分钟内只发一次，密码有效期为 15 分钟；使用后立即失效。",
++            );
++        } catch {
++            setEmailMessage("发送失败，请确认邮箱地址，稍后重试。");
++        } finally {
++            setSendingEmail(false);
++        }
++    };
+ 
+     const usernameRef = useRef<HTMLInputElement | null>(null);
+     const passwordRef = useRef<HTMLInputElement | null>(null);
+@@ -124,7 +150,7 @@ const FirstFactorForm = function (props: Props) {
+ 
+         try {
+             const res = await postFirstFactor(
+-                username,
++                emailLogin ? username.trim().toLowerCase() : username,
+                 password,
+                 rememberMe,
+                 redirectionURL,
+@@ -149,6 +175,7 @@ const FirstFactorForm = function (props: Props) {
+         }
+     }, [
+         loading,
++        emailLogin,
+         username,
+         password,
+         props,
+@@ -253,7 +280,7 @@ const FirstFactorForm = function (props: Props) {
+                         <FloatingInput
+                             ref={usernameRef}
+                             id="username-textfield"
+-                            label={`${translate("Username")} *`}
++                            label={emailLogin ? "邮箱地址 *" : `${translate("Username")} *`}
+                             required
+                             value={username}
+                             error={usernameError}
+@@ -269,7 +296,7 @@ const FirstFactorForm = function (props: Props) {
+                         <FloatingInput
+                             ref={passwordRef}
+                             id="password-textfield"
+-                            label={`${translate("Password")} *`}
++                            label={emailLogin ? "邮件中的临时密码 *" : `${translate("Password")} *`}
+                             required
+                             disabled={disabled}
+                             value={password}
+@@ -278,7 +305,7 @@ const FirstFactorForm = function (props: Props) {
+                             onChange={(v) => setPassword(v.target.value)}
+                             onFocus={() => setPasswordError(false)}
+                             type={showPassword ? "text" : "password"}
+-                            autoComplete="current-password"
++                            autoComplete={emailLogin ? "one-time-code" : "current-password"}
+                             onKeyDown={handlePasswordKeyDown}
+                             onKeyUp={handlePasswordKeyUp}
+                         />
+@@ -288,6 +315,21 @@ const FirstFactorForm = function (props: Props) {
+                             {...toggleProps}
+                         />
+                     </div>
++                    {emailLogin ? (
++                        <div className="w-full">
++                            <Button
++                                type="button"
++                                className="w-full"
++                                disabled={disabled || sendingEmail || !username.trim()}
++                                onClick={requestEmail}
++                            >
++                                {sendingEmail ? "正在发送…" : "发送登录临时密码"}
++                            </Button>
++                            <p role="status" className="mt-2 text-sm">
++                                {emailMessage}
++                            </p>
++                        </div>
++                    ) : null}
+                     {passwordCapsLock ? (
+                         <div className="w-full px-4">
+                             <Alert variant="warning">
+diff --git a/internal/handlers/handler_email_otp.go b/internal/handlers/handler_email_otp.go
+new file mode 100644
+--- /dev/null
++++ b/internal/handlers/handler_email_otp.go
+@@ -0,0 +1,77 @@
++// SPDX-License-Identifier: Apache-2.0
++package handlers
++
++import (
++	html "html/template"
++	"net/mail"
++	"os"
++	"strings"
++	text "text/template"
++
++	"github.com/authelia/authelia/v4/internal/emailotp"
++	"github.com/authelia/authelia/v4/internal/middlewares"
++	"github.com/authelia/authelia/v4/internal/templates"
++)
++
++func EmailOTPEnabled() bool { return os.Getenv("AUTH_LOGIN_MODE") == "email_otp" }
++
++var loginChallenges = &emailotp.Manager{Path: os.Getenv("AUTH_EMAIL_OTP_STATE")}
++
++type emailOTPAccount struct{ ctx *middlewares.AutheliaCtx }
++
++func (a emailOTPAccount) SetPassword(user, password string) error {
++	return a.ctx.Providers.UserProvider.UpdatePassword(user, password)
++}
++func (a emailOTPAccount) CheckPassword(user, password string) (bool, error) {
++	return a.ctx.Providers.UserProvider.CheckUserPassword(user, password)
++}
++
++func EmailOTPConfigurationGET(ctx *middlewares.AutheliaCtx) {
++	_ = ctx.SetJSONBody(struct {
++		Enabled bool `json:"enabled"`
++	}{EmailOTPEnabled()})
++}
++
++var loginEmailTemplate = &templates.EmailTemplate{
++	Text: text.Must(text.New("login").Parse("Your login password: {{.Password}}\nValid for 15 minutes, one use only. Do not share it.\nIf you did not request this login, ignore this message.")),
++	HTML: html.Must(html.New("login").Parse("<h2>登录临时密码</h2><p style='font-size:28px;letter-spacing:4px'>{{.Password}}</p><p>15 分钟内有效，仅能使用一次。请勿转发。如果不是你发起的登录，请忽略。</p>")),
++}
++
++func EmailOTPRequestPOST(ctx *middlewares.AutheliaCtx) {
++	if !EmailOTPEnabled() || ctx.Configuration.Notifier.SMTP == nil || loginChallenges.Path == "" {
++		ctx.SetStatusCode(404)
++		ctx.SetJSONError("Unavailable")
++		return
++	}
++	var body struct {
++		Username string `json:"username"`
++	}
++	if ctx.ParseBody(&body) != nil || len(body.Username) > 320 {
++		ctx.SetStatusCode(400)
++		ctx.SetJSONError("Invalid request")
++		return
++	}
++	username := strings.ToLower(strings.TrimSpace(body.Username))
++	address, err := mail.ParseAddress(username)
++	if err != nil || address.Address != username {
++		ctx.SetStatusCode(400)
++		ctx.SetJSONError("Enter an email address")
++		return
++	}
++	details, err := ctx.Providers.UserProvider.GetDetails(username)
++	// Resolve only pre-provisioned canonical email usernames, never arbitrary recipients or aliases.
++	if err == nil && details != nil && details.Username == username {
++		err = loginChallenges.Issue(username, emailOTPAccount{ctx}, func(user, password string) error {
++			return ctx.Providers.Notifier.Send(ctx, mail.Address{Address: user}, "Your one-time login password", loginEmailTemplate, struct{ Password string }{password})
++		})
++		if err != nil {
++			ctx.Logger.Error("Email login request failed")
++			ctx.SetStatusCode(503)
++			ctx.SetJSONError("Unable to send login email; try later")
++			return
++		}
++	}
++	_ = ctx.SetJSONBody(struct {
++		Message string `json:"message"`
++	}{"If this account exists, check its mailbox. Requests within 15 minutes do not resend or replace the password."})
++}

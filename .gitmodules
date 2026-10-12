@@ -1,0 +1,3 @@
+[submodule "authelia"]
+	path = authelia
+	url = https://github.com/authelia/authelia.git

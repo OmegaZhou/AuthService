@@ -1,0 +1,4 @@
+# Keep deployment scripts and source portable across Windows and Linux.
+* text=auto eol=lf
+# Patch context contains intentional indentation and blank context lines.
+*.patch -whitespace

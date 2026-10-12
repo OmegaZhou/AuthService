@@ -1,0 +1,9 @@
+# Create the password hash using the pinned Authelia crypto hash command.
+# Never commit a real user's password or password hash.
+users:
+  owner@example.com:
+    disabled: false
+    displayname: Plugin owner
+    password: 'REPLACE_WITH_ARGON2ID_HASH'
+    email: 'owner@example.com'
+    groups: [plugin-users]

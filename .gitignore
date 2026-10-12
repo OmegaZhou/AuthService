@@ -1,0 +1,16 @@
+/.build/
+/artifacts/
+/runtime/
+/configuration.yml
+/users.yml
+/account-registration.json
+*.env
+!*.env.example
+*.key
+*.pem
+*.sqlite*
+*.db*
+*.log
+*.bak
+__pycache__/
+*.py[cod]
